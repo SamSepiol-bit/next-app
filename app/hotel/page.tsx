@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 
-/* ===================== TYPES ===================== */
+// store Text data
 interface StoredHotel {
   id: number;
   hotelName: string;
@@ -11,11 +11,11 @@ interface StoredHotel {
   rating: number;
 }
 
+// add image file
 interface HotelData extends StoredHotel {
   images: File[];
 }
-
-/* ================= IMAGE SLIDER ================== */
+// Image slider logic 
 function ImageSlider({ images }: { images: File[] }) {
   const [index, setIndex] = useState(0);
 
@@ -46,7 +46,7 @@ function ImageSlider({ images }: { images: File[] }) {
   );
 }
 
-/* ================= MAIN PAGE ===================== */
+/*MAIN PAGE */
 export default function Hotel() {
   const [hotels, setHotels] = useState<HotelData[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -58,7 +58,7 @@ export default function Hotel() {
   const [rating, setRating] = useState(0);
   const [images, setImages] = useState<File[]>([]);
 
-  /* ============ LOAD FROM LOCAL STORAGE (NO IMAGES) ============ */
+  /* LOAD FROM LOCAL STORAGE (NO IMAGES) */
   useEffect(() => {
     const stored = localStorage.getItem("hotels");
     if (!stored) return;
@@ -153,7 +153,6 @@ export default function Hotel() {
     saveToLocalStorage(updated);
   };
 
-  /* ===================== UI ===================== */
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white border-b">
