@@ -12,6 +12,55 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  /* ================= LIGHT / BRAND ================= */
+  
+  --color-primary-100: #9695B0;   /* brand purple */
+  --color-accent-100: #BFEDE3;    /* mint accent */
+  --color-accent-200: #D7E0EB;
+
+  --color-bg-100: #F9FAFB;
+  --color-bg-200: #E6E6E6;
+
+  /* ================= DARK SURFACES ================= */
+  --color-dark-900: #0B0D12;      /* main dark background */
+  --color-dark-800: #121520;      /* page background */
+  --color-dark-700: #1A1F2E;      /* cards */
+  --color-dark-600: #23283A;      /* borders / dividers */
+  --color-dark-500: #2F3550;      /* hover surfaces */
+
+  /* ================= DARK TEXT ================= */
+  --color-dark-text-100: #FFFFFF; /* main text */
+  --color-dark-text-200: #D1D5DB; /* secondary text */
+  --color-dark-text-300: #9CA3AF; /* muted text */
+
+   /* ================= LIGHT TEXT ================= */
+  --color-light-text-100: #0F172A; /* primary text (headings) */
+  --color-light-text-200: #334155; /* body text */
+  --color-light-text-300: #64748B; /* muted / helper text */
+  --color-light-text-400: #94A3B8; /* placeholders */
+  --color-light-text-500: #CBD5E1; /* disabled text */
+
+  /* ================= LIGHT UI ACCENTS ================= */
+  --color-light-border-100: #E5E7EB; /* card borders */
+  --color-light-border-200: #CBD5E1; /* input borders */
+
+  --color-light-success: #22C55E;
+  --color-light-warning: #FACC15;
+  --color-light-danger: #EF4444;
+  --color-light-info: #3B82F6;
+
+  /* ================= DARK ACCENTS ================= */
+  --color-dark-primary: #A7A6C8;  /* lighter purple for dark bg */
+  --color-dark-accent: #7FE7D3;   /* mint pop */
+  --color-dark-warning: #FACC15;  /* stars / ratings */
+  --color-dark-danger: #EF4444;   /* delete buttons */
+
+  /* ================= SHADOW / OVERLAY ================= */
+  --color-dark-overlay: rgba(0, 0, 0, 0.6);
+}
+
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
