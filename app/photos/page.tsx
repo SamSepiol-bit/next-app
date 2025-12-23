@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { APP_URL } from "../config/constant";
+import Image from "next/image";
 
 interface Photo {
   albumId: number;
@@ -72,11 +73,13 @@ export default function Photos() {
                   key={photo.id}
                   className="rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-4 shadow-sm hover:shadow-lg transition"
                 >
-                  <img
+                  <Image
                     src={photo.thumbnailUrl}
                     alt={photo.title}
                     loading="lazy"
                     className="w-full h-40 object-cover rounded-lg mb-3"
+                    width={100}
+                    height={100}
                   />
 
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white">

@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {MessageCircle, ImageIcon, Folder, GalleryHorizontal, ListTodo, Users, Hotel,} from "lucide-react";
-import { title } from "process";
-import path from "path";
+
 
 export default function Home() {
     const router = useRouter();
@@ -52,13 +51,13 @@ export default function Home() {
                 desc: "Manage users",
                 icon: Hotel,
                 path: "/hotel",
+            },
+            {
+                title: "Homehotel",
+                desc: "Landing page",
+                icon: Hotel,
+                path: "/hotelHome"
             }
-            // {
-            //     title: "Homehotel",
-            //     desc: "Landing page",
-            //     icon: Hotel,
-            //     path: "/hotelHome"
-            // }
         ];
 
     return(

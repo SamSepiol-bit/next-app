@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
+
 export default function HotelHomePage() {
   return (
     <main className="bg-[var(--color-light-bg-main)] text-[var(--color-light-text-100)]">
-      {/* ================= HERO SECTION ================= */}
+      {/*  HERO SECTION  */}
       <section
         className="relative h-[90vh] flex items-center justify-center"
         style={{
           backgroundImage:
-            "url(https://images.unsplash.com/photo-1501117716987-c8e1ecb2102a?auto=format&fit=crop&w=1600&q=80)",
+            "url(https://images.unsplash.com/photo-1551105378-78e609e1d468?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -28,7 +30,7 @@ export default function HotelHomePage() {
         </div>
       </section>
 
-      {/* ================= ABOUT SECTION ================= */}
+      {/*ABOUT SECTION  */}
       <section className="py-20 px-6 max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <img
           src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80"
@@ -51,7 +53,7 @@ export default function HotelHomePage() {
         </div>
       </section>
 
-      {/* ================= ROOMS SECTION ================= */}
+      {/* ROOMS SECTION */}
       <section className="py-20 bg-[var(--color-light-bg-surface)]">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-3xl font-bold text-center mb-12">Our Rooms</h2>
