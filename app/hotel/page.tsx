@@ -12,6 +12,8 @@ import NoResults from "../components/NoResults";
 import FilterSidebar from "../components/FilterSidebar";
 import FilterButton from "../components/FilterButton";
 import { Star } from "lucide-react";
+import NativePage from "../components/Pagination";
+import Pagination from "../components/Pagination";
 
 /* TYPES */
 interface StoredHotel {
@@ -53,13 +55,22 @@ export default function Hotel() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
 
+  const [page, setPage] = useState<number>(1);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  
   const { search } = useSearch();
+  const [itemsPerPage] = useState(9);
 
   /* LOAD HOTELS */
   useEffect(() => {
     const stored = localStorage.getItem("hotels");
     if (!stored) return;
+
     const parsed: StoredHotel[] = JSON.parse(stored);
+
+    const generateRandomPrice  = () => Math.floor(Math.random() * 500) +50;
+
     setHotels(parsed.map((h) => ({
       ...h,
       images: [],
@@ -100,6 +111,22 @@ export default function Hotel() {
       }
       return 0;
     });
+
+    const totalPages = Math.ceil(filteredHotels.length / itemsPerPage);
+
+    //calculate start and ending index for current page
+    const startIndex = (currentPage - 1 ) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+
+    // get current page index
+    const paginatedHotels = filteredHotels.slice(startIndex, endIndex);
+
+    // calculate range of dispaly
+    const getDisplayRange =() => {
+      const start = startIndex + 1;
+      const end = Math.min(endIndex, filteredHotels.length);
+      return `${start}-${end}`;
+    };
 
   /* SAVE TO LOCALSTORAGE */
   const saveToLocalStorage = (data: HotelData[]) => {
@@ -182,29 +209,40 @@ export default function Hotel() {
       setSortOption(option);
       setSortDirection("asc");
     }
+    setCurrentPage(1);
   };
 
   /* FILTER HANDLERS */
   const toggleRatingFilter = (rating: number) => {
-    setSelectedRatings(prev => prev.includes(rating) ? prev.filter(r => r !== rating) : [...prev, rating]);
+    setSelectedRatings(prev => prev.includes(rating) ? prev.filter(r => r !== rating)
+  : [...prev, rating]);
+  setCurrentPage(1);
   };
 
   const handlePriceChange = (range: [number, number]) => {
     setPriceRange(range);
+    setCurrentPage(1);
   };
 
   const toggleLocationFilter = (location: string) => {
     setSelectedLocations(prev => prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]);
+    setCurrentPage(1);
   };
 
   const clearAllFilters = () => {
     setSelectedRatings([]);
     setPriceRange([0, 1000]);
     setSelectedLocations([]);
+    setCurrentPage(1);
   };
 
   const isAnyFilterActive = selectedRatings.length > 0 || priceRange[0] > 0 || priceRange[1] < 1000 || selectedLocations.length > 0;
   const filterCount = selectedRatings.length + selectedLocations.length + (priceRange[0] > 0 ? 1 : 0) + (priceRange[1] < 1000 ? 1 : 0);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scroll({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <main className="relative">
@@ -221,7 +259,7 @@ export default function Hotel() {
           <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
               <FilterButton onClick={() => setShowFilterSidebar(true)} filterCount={filterCount} />
-              <h1 className="text-2xl font-bold text-white"></h1>
+              <h1 className="text-2xl font-bold text-white">Hotels</h1>
             </div>
             <div className="flex gap-4 items-center">
               <HotelSearch />
@@ -256,15 +294,34 @@ export default function Hotel() {
           />
 
           <div className="flex-1">
-            <ResultsHeader
-              filteredCount={filteredHotels.length}
-              totalCount={hotels.length}
-              isAnyFilterActive={isAnyFilterActive}
-              selectedRatings={selectedRatings}
-              selectedLocations={selectedLocations}
-              priceRange={priceRange}
-              onClearFilters={clearAllFilters}
-            />
+            {/* Results Header with Pagination Info */}
+            <div className="mb-6">
+              <ResultsHeader
+                filteredCount={filteredHotels.length}
+                totalCount={hotels.length}
+                isAnyFilterActive={isAnyFilterActive}
+                selectedRatings={selectedRatings}
+                selectedLocations={selectedLocations}
+                priceRange={priceRange}
+                onClearFilters={clearAllFilters}
+              />
+              
+              {/* Pagination Info */}
+              {filteredHotels.length > 0 && (
+                <div className="mt-4 p-3 bg-[var(--color-dark-700)] rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div className="text-[var(--color-dark-text-200)]">
+                      Showing hotels <span className="font-bold text-white">{getDisplayRange()}</span> of{" "}
+                      <span className="font-bold text-white">{filteredHotels.length}</span>
+                    </div>
+                    <div className="text-sm text-[var(--color-dark-text-300)]">
+                      Page <span className="font-bold text-white">{currentPage}</span> of{" "}
+                      <span className="font-bold text-white">{totalPages}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {filteredHotels.length === 0 ? (
               <NoResults
@@ -273,18 +330,38 @@ export default function Hotel() {
                 onClearFilters={clearAllFilters}
               />
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredHotels.map((hotel) => (
-                  <HotelCard
-                    key={hotel.id}
-                    hotel={hotel}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+              <>
+                {/* HOTELS GRID */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+                  {paginatedHotels.map((hotel) => (
+                    <HotelCard
+                      key={hotel.id}
+                      hotel={hotel}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+
+                {/* PAGINATION CONTROLS */}
+                {totalPages > 1 && (
+                  <div className="mt-8 pt-6 border-t border-[var(--color-dark-600)]">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                      <div className="text-[var(--color-dark-text-200)]">
+                        Showing {getDisplayRange()} of {filteredHotels.length} hotels
+                      </div>
+                      <Pagination
+                        current={currentPage}
+                        total={totalPages}
+                        onChange={handlePageChange}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
+            {/* Sorting Indicator */}
             {filteredHotels.length > 0 && sortOption !== "none" && (
               <div className="mt-6 text-center">
                 <p className="text-[var(--color-dark-text-200)] inline-flex items-center gap-2 bg-[var(--color-dark-700)] px-4 py-2 rounded-lg">

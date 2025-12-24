@@ -2,10 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import LoginModal from "./LoginModel";
+
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,15 +60,29 @@ export default function Navbar() {
               Admin
             </Link>
 
-            <button 
-                className="ml-4 px-5 py-2 rounded-xl bg-[var(--color-primary-100)] text-white font-semibold hover:opacity-90 transition">
-              Book Now
+            {/* <button 
+                className="ml-4 px-5 py-2 rounded-xl bg-[var(--color-primary-100)] text-white font-semibold hover:opacity-90 transition"
+                onClick={() => setOpen(!open)}>
+              Sign In
+            </button> */}
+
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="ml-4 px-5 py-2 rounded-xl bg-[var(--color-primary-100)] text-white font-semibold hover:opacity-90 transition"
+            >
+              Login
             </button>
+
+            {/* Login Modal */}
+            <LoginModal 
+              isOpen={isLoginModalOpen}   // changed from isOpen to open
+              onClose={() => setIsLoginModalOpen(false)}
+            />
           </nav>
 
           {/* MOBILE MENU BUTTON */}
           <button
-            onClick={() => setOpen(!open)}
+            onClick={() => setShowForm(true)}
             className="md:hidden text-3xl text-[var(--color-light-text-100)]"
           >
             ☰
@@ -103,9 +121,22 @@ export default function Navbar() {
               Admin
             </Link>
 
-            <button className="w-full mt-2 px-5 py-2 rounded-xl bg-[var(--color-primary-100)] text-white font-semibold">
-              Book Now
+          
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="ml-4 px-5 py-2 rounded-xl bg-[var(--color-primary-100)] text-white font-semibold hover:opacity-90 transition"
+            >
+              Login
             </button>
+
+            {/* Login Modal */}
+            <LoginModal 
+              isOpen={isLoginModalOpen}   // changed from isOpen to open
+              onClose={() => setIsLoginModalOpen(false)}
+            />
+
+
+ 
           </div>
         )}
       </div>

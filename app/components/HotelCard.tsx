@@ -22,8 +22,23 @@ interface HotelCardProps {
 function ImageSlider({ images }: { images: File[] }) {
   const [index, setIndex] = useState(0);
 
+  // const [page, setPage] = useState(1);
+
   const next = () => setIndex((i) => (i + 1) % images.length);
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
+
+  // const hotels: Hotel[] = [
+
+  // ];
+
+  // const PER_PAGE = 9;
+
+  // const totalPages = Math.ceil(hotels.length / PER_PAGE);
+
+  // const start = (page -1) * PER_PAGE;
+  // const end = start + PER_PAGE;
+
+  // const visibleHotels = hotels.slice(start, end);
 
   return (
     <div className="relative">
