@@ -24,6 +24,7 @@ export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
+  
 }>) {
   return (
     <html lang="en">
@@ -34,6 +35,8 @@ export default function RootLayout({
         
           <SearchProvider>{children}</SearchProvider>
         <Footer /> 
+
+        
       </body>
     </html>
   );
