@@ -157,11 +157,11 @@ export default function Navbar() {
               Services
             </a>
             <Link
-              href="/hotel"
+              href="/register"
               className="block text-[var(--color-light-text-200)] hover:text-[var(--color-primary-100)]"
               onClick={() => setOpen(false)}
             >
-              Admin
+              Register
             </Link>
 
             {isLoggedIn ? (
