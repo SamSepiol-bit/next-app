@@ -2,6 +2,7 @@ import { LogIn, Mail, User, X, Lock, EyeOff, Eye, Phone, Globe, MessageSquare, K
 import React, { useState } from 'react'
 import { FcGoogle } from "react-icons/fc";
 import { useRouter } from 'next/navigation';
+import EmailVerificationModal from './EmailVerificationModal';
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -35,6 +36,12 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showLoginPassword, setShowLoginPassword] = useState(false);
     const router = useRouter();
+    
+    // Verification modal states
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
+    const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
+    const [unverifiedUserData, setUnverifiedUserData] = useState<any>(null);
+    const [loginAfterVerification, setLoginAfterVerification] = useState(false);
     
     // Registration form state
     const [formData, setFormData] = useState<CandidateFormData>({
@@ -249,18 +256,6 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                 password_confirmation: formData.password_confirmation
             };
 
-            // console.log('📤 Sending registration to:', 'https://jobsformycv.enricharcane.info/api/register/candidate');
-            // console.log('📦 Payload:', { ...payload, password: '***' });
-
-            // const response = await fetch('https://jobsformycv.enricharcane.info/api/register/candidate', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //         'Accept': 'application/json',
-            //     },
-            //     body: JSON.stringify(payload),
-            // });
-
             const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
             const endpoint = `${API_BASE_URL}/api/register/candidate`;
@@ -269,14 +264,13 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
             console.log('📦 Payload:', { ...payload, password: '***' });
 
             const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(payload),
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
             });
-
 
             const responseText = await response.text();
             console.log('📥 Response status:', response.status);
@@ -315,7 +309,18 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
             // SUCCESS
             console.log('✅ Registration successful!', data);
             
-            alert(`✅ Registration successful!\n\nWelcome ${data.candidate?.full_name || formData.first_name}!\nYour account has been created successfully.`);
+            // Check if email verification is required
+            if (data.isVerified === false) {
+                // Show verification modal immediately after registration
+                setPendingVerificationEmail(formData.email);
+                setUnverifiedUserData(data);
+                setLoginAfterVerification(false); // Not logging in, just registered
+                setShowVerificationModal(true);
+                
+                alert(`✅ Registration successful!\n\nWelcome ${data.candidate?.full_name || formData.first_name}!\nPlease verify your email to complete registration.`);
+            } else {
+                alert(`✅ Registration successful!\n\nWelcome ${data.candidate?.full_name || formData.first_name}!\nYour account has been created successfully.`);
+            }
             
             resetForms();
             onClose();
@@ -356,10 +361,10 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                 role: loginData.role
             };
 
-            const API_BASE_URL= process.env.NEXT_PUBLIC_API_BASE_URL;
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
             const endpoint = `${API_BASE_URL}/api/login`;
             
-            console.log('Sending Login to', endpoint);
+            console.log('📤 Sending Login to', endpoint);
             console.log('📤 Login payload:', payload);
 
             const response = await fetch(endpoint, {
@@ -372,17 +377,41 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
             });
 
             const responseText = await response.text();
-            console.log('📥 Login response:', response.status, responseText);
+            console.log('📥 Login response status:', response.status);
+            console.log('📥 Login response body:', responseText);
 
             let data;
             try {
                 data = JSON.parse(responseText);
             } catch (jsonError) {
-                console.error('JSON parse error:', jsonError);
+                console.error('❌ JSON parse error:', jsonError);
                 alert('Invalid server response');
                 return;
             }
 
+            // Check for 403 error (email not verified)
+            if (response.status === 403 && data.message?.includes('verification')) {
+                console.log('⚠️ Email verification required:', data.message);
+                
+                // Store user data and token even though email is not verified
+                if (data.accessToken) {
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('auth_token', data.accessToken);
+                    localStorage.setItem('unverified_user', JSON.stringify(data.user));
+                }
+                
+                // Show verification modal
+                setPendingVerificationEmail(loginData.email);
+                setUnverifiedUserData(data);
+                setLoginAfterVerification(true); // Will login after verification
+                setShowVerificationModal(true);
+                
+                // Don't close the login modal yet
+                setLoading(false);
+                return;
+            }
+
+            // Check for other errors
             if (!response.ok) {
                 if (response.status === 422 && data.errors) {
                     const backendErrors: any = {};
@@ -395,11 +424,12 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                     alert('Please fix the validation errors shown in the form.');
                     return;
                 }
-                alert(data.message || 'Login failed');
+                alert(data.message || `Login failed (${response.status})`);
                 return;
             }
 
             // Login successful
+            console.log('✅ Login successful!', data);
             localStorage.setItem('accessToken', data.accessToken);
             localStorage.setItem('user', JSON.stringify(data.user));
             
@@ -410,11 +440,61 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
             router.push('/dashboard');
             
         } catch (error: any) {
-            console.error("Login error:", error);
-            alert(error.message || "Login failed. Please try again.");
+            console.error("❌ Login error:", error);
+            alert(`Login error: ${error.message || "Login failed. Please try again."}`);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Handle verification success
+    const handleVerificationSuccess = () => {
+        console.log('✅ Email verification successful');
+        
+        if (loginAfterVerification && unverifiedUserData) {
+            // User was trying to login - complete the login process
+            console.log('🔄 Completing login process after verification');
+            
+            if (unverifiedUserData.accessToken) {
+                localStorage.setItem('accessToken', unverifiedUserData.accessToken);
+                localStorage.setItem('user', JSON.stringify(unverifiedUserData.user));
+                
+                onLoginSuccess(unverifiedUserData.user, unverifiedUserData.accessToken);
+                alert('✅ Email verified successfully! You are now logged in.');
+                
+                resetForms();
+                onClose();
+                router.push('/dashboard');
+            }
+        } else if (unverifiedUserData) {
+            // User just registered - show success message
+            alert('✅ Email verified successfully! You can now log in.');
+            
+            // Auto-fill the login form
+            setLoginData(prev => ({
+                ...prev,
+                email: pendingVerificationEmail,
+                password: '',
+                role: 'candidate'
+            }));
+            
+            // Switch to login tab
+            setIsLogin(true);
+        }
+        
+        // Clear verification states
+        setUnverifiedUserData(null);
+        setPendingVerificationEmail('');
+        setLoginAfterVerification(false);
+    };
+
+    // Handle verification modal close
+    const handleVerificationModalClose = () => {
+        // Clear verification states but keep login modal open
+        setUnverifiedUserData(null);
+        setPendingVerificationEmail('');
+        setLoginAfterVerification(false);
+        setShowVerificationModal(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -464,50 +544,58 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
 
     return (
         <>
-            <div className='fixed inset-0 bg-black/60 z-50' onClick={handleClose} />
+            <div className='fixed inset-0 bg-black/50 dark:bg-black/70 z-50' onClick={handleClose} />
             <div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-                <div className='bg-white rounded-2xl w-full max-w-lg relative overflow-hidden shadow-2xl'
+                <div className='bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg relative overflow-hidden shadow-2xl dark:shadow-gray-800/20'
                      onClick={(e) => e.stopPropagation()}>
                     
-                    <button onClick={onClose} className='absolute right-4 top-4 p-2 hover:bg-gray-100 rounded-full transition'>
-                        <X size={20} className='text-gray-500' />
+                    <button onClick={handleClose} className='absolute right-4 top-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition'>
+                        <X size={20} className='text-gray-500 dark:text-gray-400' />
                     </button>
 
-                    <div className='p-6 border-b'>
+                    <div className='p-6 border-b dark:border-gray-700'>
                         <div className='flex items-center gap-3 mb-2'>
-                            <div className='p-2 bg-blue-100 rounded-lg'>
-                                <LogIn className='text-blue-600' size={24} />
+                            <div className='p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg'>
+                                <LogIn className='text-primary-600 dark:text-primary-400' size={24} />
                             </div>
                             <div>
-                                <h2 className='text-gray-600'>
+                                <h2 className='text-gray-600 dark:text-gray-300'>
                                     {isLogin ? "Welcome Back" : "Create Account"}
                                 </h2>
-                                <p className='text-2xl font-bold text-gray-800'>
+                                <p className='text-2xl font-bold text-gray-800 dark:text-white'>
                                     {isLogin ? "Sign in to your account" : "Join our community"}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div className='flex border-b'>
+                    <div className='flex border-b dark:border-gray-700'>
                         <button onClick={() => { setIsLogin(true); resetForms(); }}
-                                className={`flex-1 py-3 text-center font-medium ${isLogin ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+                                className={`flex-1 py-3 text-center font-medium transition-colors ${
+                                    isLogin 
+                                        ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400" 
+                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                                }`}>
                             Sign In
                         </button>
                         <button onClick={() => { setIsLogin(false); resetForms(); }}
-                                className={`flex-1 py-3 text-center font-medium ${!isLogin ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+                                className={`flex-1 py-3 text-center font-medium transition-colors ${
+                                    !isLogin 
+                                        ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400" 
+                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                                }`}>
                             Sign Up
                         </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className='p-6 space-y-4 max-h-[70vh] overflow-y-auto'>
                         {isLogin ? (
-                            /* Login Form - Completed UI */
+                            /* Login Form */
                             <>
                                 {/* Email Field */}
                                 <div>
                                     <div className='relative'>
-                                        <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input 
                                             type='email'
                                             name='email'
@@ -516,20 +604,20 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='Enter your email address'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-                                                loginErrors.email ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                loginErrors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                     </div>
                                     {loginErrors.email && (
-                                        <p className='mt-1 text-sm text-red-500'>{loginErrors.email}</p>
+                                        <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{loginErrors.email}</p>
                                     )}
                                 </div>
 
                                 {/* Password Field */}
                                 <div>
                                     <div className='relative'>
-                                        <Key className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Key className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input
                                             type={showLoginPassword ? "text" : "password"}
                                             name='password'
@@ -538,27 +626,27 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='Enter your password'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-                                                loginErrors.password ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                loginErrors.password ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowLoginPassword(!showLoginPassword)}
                                             disabled={loading}
-                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 disabled:opacity-50"
                                         >
                                             {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
                                     {loginErrors.password && (
-                                        <p className='mt-1 text-sm text-red-500'>{loginErrors.password}</p>
+                                        <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{loginErrors.password}</p>
                                     )}
                                     <button 
                                         type='button' 
                                         onClick={handleForgotPassword}
                                         disabled={loading}
-                                        className='text-sm text-blue-600 hover:text-blue-800 mt-1 disabled:opacity-50'
+                                        className='text-sm text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 mt-1 disabled:opacity-50'
                                     >
                                         Forgot Password?
                                     </button>
@@ -566,7 +654,7 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
 
                                 {/* Role Selection */}
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
                                         I am a *
                                     </label>
                                     <div className="grid grid-cols-2 gap-3">
@@ -576,8 +664,8 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             disabled={loading}
                                             className={`py-3 px-4 border rounded-lg text-center font-medium transition disabled:opacity-50 ${
                                                 loginData.role === 'candidate'
-                                                ? 'border-blue-600 bg-blue-50 text-blue-600'
-                                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                                             }`}
                                         >
                                             Candidate
@@ -588,15 +676,15 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             disabled={loading}
                                             className={`py-3 px-4 border rounded-lg text-center font-medium transition disabled:opacity-50 ${
                                                 loginData.role === 'company'
-                                                ? 'border-blue-600 bg-blue-50 text-blue-600'
-                                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                                             }`}
                                         >
                                             Company
                                         </button>
                                     </div>
                                     {loginErrors.role && (
-                                        <p className='mt-1 text-sm text-red-500'>{loginErrors.role}</p>
+                                        <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{loginErrors.role}</p>
                                     )}
                                 </div>
                             </>
@@ -605,9 +693,9 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                             <>
                                 {/* Name with Initials */}
                                 <div>
-                                    <label className='block text-sm font-medium text-gray-700 mb-1 text-left'>Name with Initials *</label>
+                                    <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 text-left'>Name with Initials *</label>
                                     <div className='relative'>
-                                        <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input 
                                             type='text'
                                             name='name_with_initials'
@@ -616,62 +704,59 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='ex:- J. Doe or John D.'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.name_with_initials ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.name_with_initials ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                     </div>
                                     {errors.name_with_initials && 
-                                        <p className='mt-1 text-sm text-red-500'>{errors.name_with_initials}</p>}
+                                        <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.name_with_initials}</p>}
                                 </div>
 
                                 {/* First and Last Name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        
                                         <div className='relative'>
-                                            <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                            <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                             <input 
                                                 type='text'
                                                 name='first_name'
                                                 value={formData.first_name}
                                                 onChange={handleChange}
-                                                placeholder='first Name'
+                                                placeholder='First Name'
                                                 required
                                                 disabled={loading}
-                                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    errors.first_name ? 'border-red-500' : 'border-gray-300'
+                                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                    errors.first_name ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                                 }`}
                                             />
                                         </div>
-                                        {errors.first_name && <p className='mt-1 text-sm text-red-500'>{errors.first_name}</p>}
+                                        {errors.first_name && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.first_name}</p>}
                                     </div>
                                     <div>
-                                        
                                         <div className='relative'>
-                                            <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                            <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                             <input 
                                                 type='text'
                                                 name='last_name'
                                                 value={formData.last_name}
                                                 onChange={handleChange}
-                                                placeholder='last Name'
+                                                placeholder='Last Name'
                                                 required
                                                 disabled={loading}
-                                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    errors.last_name ? 'border-red-500' : 'border-gray-300'
+                                                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                    errors.last_name ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                                 }`}
                                             />
                                         </div>
-                                        {errors.last_name && <p className='mt-1 text-sm text-red-500'>{errors.last_name}</p>}
+                                        {errors.last_name && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.last_name}</p>}
                                     </div>
                                 </div>
 
                                 {/* Email */}
                                 <div>
-                                   
                                     <div className='relative'>
-                                        <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input 
                                             type='email'
                                             name='email'
@@ -680,18 +765,18 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='ex:- email@address.com'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.email ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                     </div>
-                                    {errors.email && <p className='mt-1 text-sm text-red-500'>{errors.email}</p>}
+                                    {errors.email && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.email}</p>}
                                 </div>
 
                                 {/* Phone */}
                                 <div>
                                     <div className='relative'>
-                                        <Phone className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Phone className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input 
                                             type='tel'
                                             name='phone'
@@ -700,26 +785,26 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='Contact Number'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.phone ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.phone ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                     </div>
-                                    {errors.phone && <p className='mt-1 text-sm text-red-500'>{errors.phone}</p>}
+                                    {errors.phone && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.phone}</p>}
                                 </div>
 
                                 {/* Country */}
                                 <div>
                                     <div className='relative'>
-                                        <Globe className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10' size={18} />
+                                        <Globe className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 z-10' size={18} />
                                         <select
                                             name='country_id'
                                             value={formData.country_id}
                                             onChange={handleChange}
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
-                                                errors.country_id ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.country_id ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         >
                                             <option value="">Select Country</option>
@@ -733,33 +818,33 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             <option value="8">Malaysia</option>
                                         </select>
                                     </div>
-                                    {errors.country_id && <p className='mt-1 text-sm text-red-500'>{errors.country_id}</p>}
+                                    {errors.country_id && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.country_id}</p>}
                                 </div>
 
                                 {/* WhatsApp */}
                                 <div>
                                     <div className='relative'>
-                                        <MessageSquare className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <MessageSquare className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input 
                                             type='tel'
                                             name='whatsapp_number'
                                             value={formData.whatsapp_number}
                                             onChange={handleChange}
-                                            placeholder='whatsapp Number'
+                                            placeholder='WhatsApp Number'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.whatsapp_number ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.whatsapp_number ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
                                     </div>
-                                    {errors.whatsapp_number && <p className='mt-1 text-sm text-red-500'>{errors.whatsapp_number}</p>}
+                                    {errors.whatsapp_number && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.whatsapp_number}</p>}
                                 </div>
 
                                 {/* Password */}
                                 <div>
                                     <div className='relative'>
-                                        <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input
                                             type={showPassword ? "text" : "password"}
                                             name='password'
@@ -768,21 +853,26 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='Enter your password'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.password ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.password ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
-                                        <button type="button" onClick={() => setShowPassword(!showPassword)} disabled={loading} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowPassword(!showPassword)} 
+                                            disabled={loading} 
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 disabled:opacity-50"
+                                        >
                                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
-                                    {errors.password && <p className='mt-1 text-sm text-red-500'>{errors.password}</p>}
+                                    {errors.password && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.password}</p>}
                                 </div>
 
                                 {/* Confirm Password */}
                                 <div>
                                     <div className='relative'>
-                                        <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' size={18} />
+                                        <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500' size={18} />
                                         <input
                                             type={showConfirmPassword ? "text" : "password"}
                                             name='password_confirmation'
@@ -791,29 +881,43 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                             placeholder='Confirm your password'
                                             required
                                             disabled={loading}
-                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                errors.password_confirmation ? 'border-red-500' : 'border-gray-300'
+                                            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                                errors.password_confirmation ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                                             }`}
                                         />
-                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} disabled={loading} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                                            disabled={loading} 
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 disabled:opacity-50"
+                                        >
                                             {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
-                                    {errors.password_confirmation && <p className='mt-1 text-sm text-red-500'>{errors.password_confirmation}</p>}
+                                    {errors.password_confirmation && <p className='mt-1 text-sm text-red-600 dark:text-red-400'>{errors.password_confirmation}</p>}
                                 </div>
 
                                 {/* Terms */}
                                 <div className='flex items-start gap-2 pt-2'>
-                                    <input type='checkbox' id='terms' required className='mt-1' disabled={loading} />
-                                    <label htmlFor='terms' className='text-sm text-gray-600'>
+                                    <input 
+                                        type='checkbox' 
+                                        id='terms' 
+                                        required 
+                                        className='mt-1 w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600' 
+                                        disabled={loading} 
+                                    />
+                                    <label htmlFor='terms' className='text-sm text-gray-600 dark:text-gray-400'>
                                         I agree to the Terms of service and Privacy Policy
                                     </label>
                                 </div>
                             </>
                         )}
 
-                        <button type='submit' disabled={loading}
-                                className='w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition flex items-center justify-center gap-2'>
+                        <button 
+                            type='submit' 
+                            disabled={loading}
+                            className='w-full py-3 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2'
+                        >
                             {loading ? (
                                 <>
                                     <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin' />
@@ -828,22 +932,28 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                         </button>
 
                         <div className='relative'>
-                            <div className='absolute inset-0 flex items-center'><div className='w-full border-t border-gray-300'></div></div>
-                            <div className='relative flex justify-center text-sm'><span className='px-2 bg-white text-gray-500'>Or continue with</span></div>
+                            <div className='absolute inset-0 flex items-center'>
+                                <div className='w-full border-t border-gray-300 dark:border-gray-700'></div>
+                            </div>
+                            <div className='relative flex justify-center text-sm'>
+                                <span className='px-2 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400'>
+                                    Or continue with
+                                </span>
+                            </div>
                         </div>
 
                         <button 
                             type="button" 
                             onClick={handleGoogleLogin}
                             disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+                            className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
                         >
                             <FcGoogle size={20} /> Continue with Google
                         </button>
                     </form>
 
-                    <div className='px-6 py-4 bg-gray-50 border-t'>
-                        <p className='text-center text-gray-600'>
+                    <div className='px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t dark:border-gray-700'>
+                        <p className='text-center text-gray-600 dark:text-gray-400'>
                             {isLogin ? "Don't have an account?" : "Already have an account? "}
                             <button 
                                 type='button' 
@@ -851,15 +961,25 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                     setIsLogin(!isLogin); 
                                     resetForms(); 
                                 }} 
-                                className='text-blue-600 font-medium hover:underline'
+                                className='text-primary-600 dark:text-primary-400 font-medium hover:underline disabled:opacity-50'
                                 disabled={loading}
                             >
-                                {isLogin ? "Sign Up" : "Sign in"}
+                                {isLogin ? "Sign Up" : "Sign In"}
                             </button>
                         </p>
                     </div>
                 </div>
             </div>
+
+            {/* Email Verification Modal */}
+            {showVerificationModal && (
+                <EmailVerificationModal
+                    isOpen={showVerificationModal}
+                    onClose={handleVerificationModalClose}
+                    email={pendingVerificationEmail}
+                    onVerificationSuccess={handleVerificationSuccess}
+                />
+            )}
         </>
     )
 }
