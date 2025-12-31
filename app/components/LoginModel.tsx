@@ -249,17 +249,34 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                 password_confirmation: formData.password_confirmation
             };
 
-            console.log('📤 Sending registration to:', 'https://jobsformycv.enricharcane.info/api/register/candidate');
+            // console.log('📤 Sending registration to:', 'https://jobsformycv.enricharcane.info/api/register/candidate');
+            // console.log('📦 Payload:', { ...payload, password: '***' });
+
+            // const response = await fetch('https://jobsformycv.enricharcane.info/api/register/candidate', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'Accept': 'application/json',
+            //     },
+            //     body: JSON.stringify(payload),
+            // });
+
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+            const endpoint = `${API_BASE_URL}/api/register/candidate`;
+
+            console.log('📤 Sending registration to:', endpoint);
             console.log('📦 Payload:', { ...payload, password: '***' });
 
-            const response = await fetch('https://jobsformycv.enricharcane.info/api/register/candidate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify(payload),
+            const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(payload),
             });
+
 
             const responseText = await response.text();
             console.log('📥 Response status:', response.status);
@@ -290,6 +307,10 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                 alert(data.message || `Registration failed (${response.status})`);
                 return;
             }
+
+            localStorage.setItem('accessToken', data.accessToken);
+            localStorage.setItem('auth_token', data.accessToken);
+            localStorage.setItem('user', JSON.stringify(data.candidate || data.user));
 
             // SUCCESS
             console.log('✅ Registration successful!', data);
@@ -335,9 +356,13 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                 role: loginData.role
             };
 
+            const API_BASE_URL= process.env.NEXT_PUBLIC_API_BASE_URL;
+            const endpoint = `${API_BASE_URL}/api/login`;
+            
+            console.log('Sending Login to', endpoint);
             console.log('📤 Login payload:', payload);
 
-            const response = await fetch('https://jobsformycv.enricharcane.info/api/login', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
