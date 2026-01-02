@@ -1,4 +1,4 @@
-import { LogIn, Mail, User, X, Lock, EyeOff, Eye, Phone, Globe, MessageSquare, Key } from 'lucide-react';
+import { LogIn, Mail, User, X, Lock, EyeOff, Eye, Phone, Globe, MessageSquare, Key, Apple } from 'lucide-react';
 import React, { useState } from 'react'
 import { FcGoogle } from "react-icons/fc";
 import { useRouter } from 'next/navigation';
@@ -540,6 +540,10 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
         alert('Google login feature coming soon!');
     }
 
+    const handleAppleLogin = () => {
+        alert('Apple login feature comming soon!');
+    }
+
     if (!isOpen) return null;
 
     return (
@@ -916,11 +920,11 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                         <button 
                             type='submit' 
                             disabled={loading}
-                            className='w-full py-3 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2'
+                            className='w-full py-3 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-100 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2'
                         >
                             {loading ? (
                                 <>
-                                    <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                                    <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin ' />
                                     {isLogin ? "Signing In..." : "Creating Account..."}
                                 </>
                             ) : (
@@ -950,6 +954,15 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                         >
                             <FcGoogle size={20} /> Continue with Google
                         </button>
+
+                        <button
+                            type='button'
+                            onClick={handleAppleLogin}
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                        >
+                            <Apple size={20} /> Continue with Apple
+                        </button>
                     </form>
 
                     <div className='px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t dark:border-gray-700'>
@@ -961,7 +974,7 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                                     setIsLogin(!isLogin); 
                                     resetForms(); 
                                 }} 
-                                className='text-primary-600 dark:text-primary-400 font-medium hover:underline disabled:opacity-50'
+                                className='text-primary-600 dark:text-primary-400 font-medium hover:underline disabled:opacity-50 text-blue-600'
                                 disabled={loading}
                             >
                                 {isLogin ? "Sign Up" : "Sign In"}
@@ -973,12 +986,12 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
 
             {/* Email Verification Modal */}
             {showVerificationModal && (
-                <EmailVerificationModal
-                    isOpen={showVerificationModal}
-                    onClose={handleVerificationModalClose}
-                    email={pendingVerificationEmail}
-                    onVerificationSuccess={handleVerificationSuccess}
-                />
+            <EmailVerificationModal
+                isOpen={showVerificationModal}
+                onClose={handleVerificationModalClose}
+                email={pendingVerificationEmail}
+                onVerificationComplete={handleVerificationSuccess}
+            />
             )}
         </>
     )
