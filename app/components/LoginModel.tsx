@@ -935,7 +935,7 @@ export default function LoginModel({ isOpen, onClose, onLoginSuccess }: LoginMod
                             )}
                         </button>
 
-                        <div className='relative'>
+                        <div className='relative'>  
                             <div className='absolute inset-0 flex items-center'>
                                 <div className='w-full border-t border-gray-300 dark:border-gray-700'></div>
                             </div>

@@ -1,4 +1,4 @@
-export const APP_URL = "https://jsonplaceholder.typicode.com/"
+export const APP_URL = "https://jobsformycv.enricharcane.info"
 
 
 // www.abc/dev.com
