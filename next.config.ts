@@ -8,15 +8,16 @@ const nextConfig = {
   images: {
     // List of allowed external image domains
     remotePatterns: [
-      {
-        protocol: 'https', // Only allow HTTPS (secure)
-        hostname: 'ui-avatars.com', // Your avatar service
-        pathname: '/api/**', // Allow all paths under /api/
-      },
+      
       {
         protocol: 'https',
         hostname: 'jobsformycv.enricharcane.info', // Your API domain
         pathname: '/**', // Allow all paths
+      },
+      {
+        protocol: 'https', // Only allow HTTPS (secure)
+        hostname: 'ui-avatars.com', // Your avatar service
+        pathname: '/api/**', // Allow all paths under /api/
       },
       {
         protocol: 'https',

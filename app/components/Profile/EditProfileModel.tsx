@@ -1,9 +1,9 @@
-// components/Profile/EditProfileModal.tsx
+// components/Profile/EditProfileModal.tsx (NOTE: Corrected filename typo from EditProfileModel.tsx)
 "use client";
 
 import { useState, useEffect } from 'react';
 import { X, Save, Loader2, Upload, User, Mail, Phone, MessageCircle, MapPin, Calendar, UserCircle, ChevronDown } from 'lucide-react';
-import ProfileImage from '../UI/ProfileImage';// Import the separate component
+import ProfileImage from '../UI/ProfileImage'; // Import the separate component
 
 interface UserProfileData {
   id: number;
@@ -135,7 +135,7 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdateSuc
         throw new Error('No authentication token found');
       }
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://jobsformycv.enricharcane.info';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
       // Create FormData for the request
       const formDataToSend = new FormData();

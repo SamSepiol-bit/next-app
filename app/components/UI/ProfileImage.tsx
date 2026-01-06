@@ -47,8 +47,37 @@ export default function ProfileImage({
       'bg-yellow-600', 'bg-pink-600', 'bg-indigo-600', 'bg-teal-600'
     ];
     const hash = alt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length]; // Fixed: changed & to %
+    return colors[hash % colors.length];
   };
+
+  // Convert relative URL to absolute URL
+  const getAbsoluteUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+
+    // If it's already an absolute URL starting with http:// or https://
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    if (url.startsWith('/storage/')) {
+      // Convert to absolute URL using API base URL
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+      return `${API_BASE_URL}${url}`;
+    }
+    
+    return url;
+  };
+
+  const absoluteSrc = getAbsoluteUrl(src);
+
+  // Debug log
+  // console.log('ProfileImage debug:', {
+  //   originalSrc: src,
+  //   absoluteSrc: absoluteSrc,
+  //   hasSrc: !!src,
+  //   isRelative: src?.startsWith('/'),
+  //   isAbsolute: src?.startsWith('http'),
+  // });
 
   // If no src or image failed to load
   if (!src || imageError) {
@@ -73,19 +102,38 @@ export default function ProfileImage({
     );
   }
 
-  // Try to use Next.js Image for optimization
+  // Determine if we should use Next.js Image or regular img tag
+  // Use Next.js Image only for absolute URLs that match our domain
+  const shouldUseNextImage = absoluteSrc && 
+    absoluteSrc.startsWith('https://jobsformycv.enricharcane.info') &&
+    !imageError;
+
   return (
     <div className={`${sizeClasses[size]} relative rounded-full overflow-hidden ${className}`}>
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        className="object-cover"
-        sizes={`${size === 'sm' ? '48px' : size === 'md' ? '64px' : size === 'lg' ? '96px' : '128px'}`}
-        onError={() => setImageError(true)}
-        onLoad={() => setImageLoaded(true)}
-        priority={size === 'lg' || size === 'xl'}
-      />
+      {shouldUseNextImage ? (
+        // Use Next.js Image for optimized external images
+        <Image
+          src={absoluteSrc}
+          alt={alt}
+          fill
+          className="object-cover"
+          sizes={`${size === 'sm' ? '48px' : size === 'md' ? '64px' : size === 'lg' ? '96px' : '128px'}`}
+          onError={() => setImageError(true)}
+          onLoad={() => setImageLoaded(true)}
+          priority={size === 'lg' || size === 'xl'}
+        />
+      ) : (
+        // Use regular img tag for other cases
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={absoluteSrc || src}
+          alt={alt}
+          className="object-cover w-full h-full"
+          onError={() => setImageError(true)}
+          onLoad={() => setImageLoaded(true)}
+        />
+      )}
+      
       {/* Loading skeleton */}
       {!imageLoaded && (
         <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />

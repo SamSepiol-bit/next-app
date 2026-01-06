@@ -7,11 +7,10 @@ import {
   Edit, Globe, MessageCircle, Award, Briefcase, FileText,
   CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
-import Image from 'next/image';
-import { format } from 'date-fns'; // Fixed import - was 'path'
+import { format } from 'date-fns';
 import EditProfileModal from '../components/Profile/EditProfileModel';
-
-
+import ProfileImage from '../components/UI/ProfileImage';
+import CVUploadModal from '../components/Profile/CVUploadModal';
 
 interface UserProfileData {
   id: number;
@@ -37,21 +36,26 @@ interface UserProfileData {
   is_online: boolean;
   available_free_jobs_count: number;
   referral_count: number;
+  cv_document?: string;
+  cv_document_name?: string;
+  cv_update_at?: string;
 }
 
 interface UserProfileProps {
   userId?: number;
 }
 
+
+
 export default function UserProfile({ userId }: UserProfileProps) {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCVModalOpen, setIsCVModalOpen] = useState(false);
 
-
-  // debug part
-useEffect(() => {
+  // Debug part
+  useEffect(() => {
     console.log('=== DEBUG: UserProfile Mounted ===');
     console.log('typeof window:', typeof window);
     console.log('All localStorage items:');
@@ -69,39 +73,78 @@ useEffect(() => {
   }, [userId]);
 
   const fetchProfile = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const token = localStorage.getItem('accessToken');
-    
-    // Optional: Check if it might be stored elsewhere too
-    if (!token) {
-      const fallbackToken = localStorage.getItem('auth_token') || 
-                           localStorage.getItem('token') || 
-                           localStorage.getItem('access_token');
+      const token = localStorage.getItem('accessToken');
       
-      if (!fallbackToken) {
-        throw new Error('No authentication token found. Please login again.');
+      // Optional: Check if it might be stored elsewhere too
+      if (!token) {
+        const fallbackToken = localStorage.getItem('auth_token') || 
+                            localStorage.getItem('token') || 
+                            localStorage.getItem('access_token');
+        
+        if (!fallbackToken) {
+          throw new Error('No authentication token found. Please login again.');
+        }
+        console.log('Using fallback token from key:', 
+          localStorage.getItem('auth_token') ? 'auth_token' : 
+          localStorage.getItem('token') ? 'token' : 'access_token'
+        );
+        
+        // Use the fallback token
+        const cleanToken = fallbackToken.replace(/['"]+/g, '').trim();
+        
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+        console.log('Fetching with fallback token from:', API_BASE_URL);
+        
+        const response = await fetch(
+          `${API_BASE_URL}/api/candidate-profile`,
+          {
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Process avatar URL
+        if (data.candidate) {
+          const profileData = data.candidate;
+          if (profileData.avatar && profileData.avatar.startsWith('/storage')) {
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+            profileData.avatar = `${API_BASE_URL}${profileData.avatar}`;
+          }
+          setProfile(profileData);
+        } else {
+          throw new Error('No profile data found');
+        }
+        return;
       }
-      console.log('Using fallback token from key:', 
-        localStorage.getItem('auth_token') ? 'auth_token' : 
-        localStorage.getItem('token') ? 'token' : 'access_token'
-      );
-      
-      // Use the fallback token
-      const cleanToken = fallbackToken.replace(/['"]+/g, '').trim();
-      
+    
+      // Clean the token (remove quotes if present)
+      const cleanToken = token.replace(/['"]+/g, '').trim();
+      console.log('Using accessToken, first 20 chars:', cleanToken.substring(0, 20) + '...');
+
+      // Use environment variable
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-      console.log('Fetching with fallback token from:', API_BASE_URL);
       
+      console.log('Fetching from:', API_BASE_URL);
+
       const response = await fetch(
         `${API_BASE_URL}/api/candidate-profile`,
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
           },
         }
       );
@@ -113,50 +156,23 @@ useEffect(() => {
       const data = await response.json();
       
       if (data.candidate) {
-        setProfile(data.candidate);
+        const profileData = data.candidate;
+        // Process avatar URL
+        if (profileData.avatar && profileData.avatar.startsWith('/storage/')) {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+          profileData.avatar = `${API_BASE_URL}${profileData.avatar}`;
+        }
+        setProfile(profileData);
       } else {
         throw new Error('No profile data found');
       }
-      return;
+    } catch (err: any) {
+      setError(err.message || 'Failed to load profile');
+      console.error('Profile fetch error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    // Clean the token (remove quotes if present)
-    const cleanToken = token.replace(/['"]+/g, '').trim();
-    console.log('Using accessToken, first 20 chars:', cleanToken.substring(0, 20) + '...');
-
-    // Use environment variable
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://jobsformycv.enricharcane.info';
-    
-    console.log('Fetching from:', API_BASE_URL);
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/candidate-profile`,
-      {
-        headers: {
-          'Authorization': `Bearer ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.candidate) {
-      setProfile(data.candidate);
-    } else {
-      throw new Error('No profile data found');
-    }
-  } catch (err: any) {
-    setError(err.message || 'Failed to load profile');
-    console.error('Profile fetch error:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -168,6 +184,10 @@ useEffect(() => {
 
   const handleUpdateSuccess = (updatedProfile: UserProfileData) => {
     setProfile(updatedProfile);
+  };
+
+  const handleCVUpdateSuccess = () => {
+    fetchProfile();
   };
 
   if (loading) {
@@ -214,23 +234,16 @@ useEffect(() => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="relative">
-              <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
-                {/* Fallback avatar since Image might fail */}
-                <div className="w-full h-full bg-blue-600 dark:bg-blue-700 flex items-center justify-center">
-                  <span className="text-white text-3xl font-bold">
-                    {profile.full_name
-                      .split(' ')
-                      .map(n => n[0])
-                      .join('')
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </span>
-                </div>
+                <ProfileImage
+                  src={profile.avatar}
+                  alt={profile.full_name}
+                  size="lg"
+                  className="border-4 border-white dark:border-gray-700"
+                />
+                {profile.is_online && (
+                  <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-gray-700 z-10"></div>
+                )}
               </div>
-              {profile.is_online && (
-                <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-400 rounded-full border-2 border-white dark:border-gray-700"></div>
-              )}
-            </div>
             <div>
               <h1 className="text-2xl font-bold">{profile.full_name}</h1>
               <p className="text-blue-100 dark:text-gray-300">@{profile.username}</p>
@@ -247,10 +260,11 @@ useEffect(() => {
               </div>
             </div>
           </div>
-          <button className="p-2 bg-white/20 dark:bg-gray-700/50 hover:bg-white/30 dark:hover:bg-gray-600/50 rounded-lg transition">
-            <Edit 
-              onClick={() => setIsEditModalOpen(true)}
-              className="w-5 h-5" />
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className="p-2 bg-white/20 dark:bg-gray-700/50 hover:bg-white/30 dark:hover:bg-gray-600/50 rounded-lg transition"
+          >
+            <Edit className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -445,10 +459,23 @@ useEffect(() => {
                   </span>
                 </div>
 
-                <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 transition flex items-center justify-center">
-                  <FileText className="w-5 h-5 mr-2" />
-                  {profile.is_cv_published ? 'Update CV' : 'Publish CV'}
+                <button
+                  onClick={() => setIsCVModalOpen(true)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 transition flex items-center justify-center"
+                  >
+                    <FileText className="w-5 h-5 mr-2" />
+                    {profile.is_cv_published ? 'Update CV' : 'Publish CV'}
                 </button>
+                
+              {isCVModalOpen && (
+                <CVUploadModal
+                  isOpen={isCVModalOpen}
+                  onClose={() => setIsCVModalOpen(false)}
+                  onSuccess={handleCVUpdateSuccess}
+                  currentCVName={profile.cv_document_name}
+                  currentCVUrl={profile.cv_document}
+                />
+              )}
               </div>
             </div>
 
@@ -496,38 +523,22 @@ useEffect(() => {
               <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={() => setIsEditModalOpen(true)}
-                  className="p-2 bg-white/20 dark:bg-gray-700/50 hover:bg-white/30 dark:hover:bg-gray-600/50 rounded-lg transition"
-                  >
+                  className="p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex flex-col items-center"
+                >
                   <Edit className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-2" />
                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Edit Profile</span>
                 </button>
-
-                {/* <button 
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex flex-col items-center"
-                  >
-                  <Edit className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-2" />
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Edit Profile</span>
-                </button> */}
-
-                     {isEditModalOpen && profile && (
-                  <EditProfileModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
-                    profile={profile}
-                    onUpdateSuccess={handleUpdateSuccess}
-                  />
-                )}
-
 
                 <button className="p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex flex-col items-center">
                   <Shield className="w-5 h-5 text-green-600 dark:text-green-400 mb-2" />
                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200">KYC Verify</span>
                 </button>
+                
                 <button className="p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex flex-col items-center">
                   <Mail className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2" />
                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Verify Email</span>
                 </button>
+                
                 <button className="p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition flex flex-col items-center">
                   <Globe className="w-5 h-5 text-orange-600 dark:text-orange-400 mb-2" />
                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Share Profile</span>
@@ -555,6 +566,16 @@ useEffect(() => {
           </div>
         )}
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditModalOpen && profile && (
+        <EditProfileModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          profile={profile}
+          onUpdateSuccess={handleUpdateSuccess}
+        />
+      )}
     </div>
   );
 }
